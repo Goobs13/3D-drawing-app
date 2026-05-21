@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Drawing App - Screen Plane</title>
+    <title>3D Drawing App - Continuous Lines</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #1a1a1a; }
         canvas { display: block; }
@@ -20,8 +20,8 @@
 <body>
 
     <div id="ui-overlay">
-        <h1>3D Screen-Plane Drawing</h1>
-        <p>Right Click + Drag to rotate the world, then Left Click to sketch from that angle!</p>
+        <h1>3D Continuous Drawing</h1>
+        <p>Left Click + Drag: <b>Draw Smooth Lines</b><br>Right Click + Drag: <b>Rotate Camera</b></p>
     </div>
 
     <script type="importmap">
@@ -52,12 +52,12 @@
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.mouseButtons = {
-            LEFT: THREE.MOUSE.NONE,      // Drawing
-            MIDDLE: THREE.MOUSE.DOLLY,   // Zoom
-            RIGHT: THREE.MOUSE.ROTATE    // Camera Orbit
+            LEFT: THREE.MOUSE.NONE,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.ROTATE
         };
 
-        // 3. Visual Grid Floor (just for spatial reference now)
+        // 3. Visual Grid Floor
         const gridHelper = new THREE.GridHelper(30, 30, 0x444444, 0x222222);
         scene.add(gridHelper);
 
@@ -73,52 +73,83 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         let isDrawing = false;
-
-        // Initialize an empty mathematical plane
         const drawingPlane = new THREE.Plane();
+
+        // Arrays to manage the current active stroke
+        let currentStrokePoints = [];
+        let currentStrokeMesh = null;
 
         // 6. Event Listeners
         window.addEventListener('pointerdown', (event) => {
             if (event.button === 0) { 
                 isDrawing = true;
+                
+                // Reset tracking variables for a brand new stroke
+                currentStrokePoints = [];
+                currentStrokeMesh = null;
+
+                // Lock the drawing plane's orientation to face the camera on the initial click
+                const cameraDirection = new THREE.Vector3();
+                camera.getWorldDirection(cameraDirection);
+                const planeNormal = cameraDirection.clone().negate();
+                drawingPlane.setFromNormalAndCoplanarPoint(planeNormal, controls.target);
+
                 addPoint(event);
             }
         });
 
         window.addEventListener('pointerup', (event) => {
-            if (event.button === 0) isDrawing = false;
+            if (event.button === 0) {
+                isDrawing = false;
+            }
         });
 
         window.addEventListener('pointermove', (event) => {
-            if (isDrawing) addPoint(event);
+            if (isDrawing) {
+                addPoint(event);
+            }
         });
 
         function addPoint(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-            // NEW MECHANIC: Calculate the direction the camera is facing
-            const cameraDirection = new THREE.Vector3();
-            camera.getWorldDirection(cameraDirection);
-            
-            // Invert it so the plane's face normal points back at the camera
-            const planeNormal = cameraDirection.clone().negate();
-
-            // Set the plane to face the camera, slicing exactly through the center pivot point
-            drawingPlane.setFromNormalAndCoplanarPoint(planeNormal, controls.target);
-
-            // Shoot the raycaster laser
             raycaster.setFromCamera(mouse, camera);
             const intersectionPoint = new THREE.Vector3();
             
             if (raycaster.ray.intersectPlane(drawingPlane, intersectionPoint)) {
-                // Spawn the 3D drawing point
-                const geometry = new THREE.SphereGeometry(0.15, 8, 8);
-                const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.2 });
-                const sphere = new THREE.Mesh(geometry, material);
                 
-                sphere.position.copy(intersectionPoint);
-                scene.add(sphere);
+                // Optimization: Only add a new point if the mouse has moved a tiny bit away from the last point
+                if (currentStrokePoints.length > 0) {
+                    const lastPoint = currentStrokePoints[currentStrokePoints.length - 1];
+                    if (intersectionPoint.distanceTo(lastPoint) < 0.1) {
+                        return; // Mouse barely moved, don't waste memory
+                    }
+                }
+
+                currentStrokePoints.push(intersectionPoint.clone());
+
+                // We need at least 2 points to draw a line segment
+                if (currentStrokePoints.length > 1) {
+                    
+                    // Create a smooth mathematical curve passing through our array of points
+                    const curve = new THREE.CatmullRomCurve3(currentStrokePoints);
+                    
+                    // Generate a 3D pipe geometry around that curve path
+                    // Parameters: (path, tubularSegments, radius, radialSegments, closed)
+                    const geometry = new THREE.TubeGeometry(curve, currentStrokePoints.length * 2, 0.08, 8, false);
+                    const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+
+                    // Clean up the old segment before drawing the updated, longer version
+                    if (currentStrokeMesh) {
+                        scene.remove(currentStrokeMesh);
+                        currentStrokeMesh.geometry.dispose(); // Free up graphics card memory
+                    }
+
+                    // Create the new mesh and add it to our scene
+                    currentStrokeMesh = new THREE.Mesh(geometry, material);
+                    scene.add(currentStrokeMesh);
+                }
             }
         }
 
