@@ -1,0 +1,25 @@
+- move around like minecraft spectator mode
+- transparent plane appears so you know where you're drawing
+- cube in corner for orientation
+- shows a point in the center that is the point you're rotating around
+- press diff keys to do diff things
+ --- eg. z for pan, x for rotate, wasd for moving in xy, rf for moving in z plane, 
+     space for draw, backspace for delete?, 
+
+- a mode where the "pen" is up or down (and you can see where it is with a 
+pointer in the middle), and just by moving around in the world you change where you draw
+--- like the only thing the mouse does is it decides whether it's drawing or not (doesnt
+    matter if you move it), and the movenent is done with wasdrf or smth, and the pointer
+    is a constant distance from the screen so you can control it
+--- maybe with the arrow keys you control the orientation/camera view, and with wasdrf 
+    you control where you move. (arrow keys rotate up/down around center and side side
+    around center so you have a full sphere of rotation)(maybe right click for rotation 
+    instead of arrow keys)
+
+- maybe a mode where you can move the plane you're drawing on, then lock it in place, draw
+  on that plane, then move it again when you want (eg. p for plane move)
+--- wasdrf maybe for plane move?
+
+- undo/redo
+
+      
