@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Drawing App - Continuous Lines</title>
+    <title>3D Drawing App - Bounded Canvas</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #1a1a1a; }
         canvas { display: block; }
@@ -20,8 +20,9 @@
 <body>
 
     <div id="ui-overlay">
-        <h1>3D Continuous Drawing</h1>
-        <p>Left Click + Drag: <b>Draw Smooth Lines</b><br>Right Click + Drag: <b>Rotate Camera</b></p>
+        <h1>3D Bounded Sketchpad</h1>
+        <p>The yellow sketchpad is now a fixed size.</p>
+        <p>Left Click + Drag: <b>Draw inside the yellow pad</b><br>Right Click + Drag: <b>Orbit Camera</b></p>
     </div>
 
     <script type="importmap">
@@ -69,31 +70,45 @@
         directionalLight.position.set(10, 20, 10);
         scene.add(directionalLight);
 
-        // 5. Drawing Logic Variables
+        // 5. CHANGED: Shrunk PlaneGeometry from (25, 25) to (8, 8)
+        const planeGeometry = new THREE.PlaneGeometry(8, 8);
+        const planeMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffcc00,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            roughness: 0.4
+        });
+        const visualPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+        scene.add(visualPlane);
+
+        // Create a sharp, less transparent border around the edges
+        const borderEdges = new THREE.EdgesGeometry(planeGeometry);
+        const borderMaterial = new THREE.LineBasicMaterial({ 
+            color: 0xffcc00, 
+            transparent: true, 
+            opacity: 0.8             // 80% opaque so it stands out clearly
+        });
+        const border = new THREE.LineSegments(borderEdges, borderMaterial);
+
+        // Add the border as a child of the plane so they stay locked together
+        visualPlane.add(border);
+
+        // 6. Drawing Logic Variables
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         let isDrawing = false;
-        const drawingPlane = new THREE.Plane();
 
-        // Arrays to manage the current active stroke
         let currentStrokePoints = [];
         let currentStrokeMesh = null;
 
-        // 6. Event Listeners
+        // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
             if (event.button === 0) { 
                 isDrawing = true;
-                
-                // Reset tracking variables for a brand new stroke
                 currentStrokePoints = [];
                 currentStrokeMesh = null;
-
-                // Lock the drawing plane's orientation to face the camera on the initial click
-                const cameraDirection = new THREE.Vector3();
-                camera.getWorldDirection(cameraDirection);
-                const planeNormal = cameraDirection.clone().negate();
-                drawingPlane.setFromNormalAndCoplanarPoint(planeNormal, controls.target);
-
                 addPoint(event);
             }
         });
@@ -115,48 +130,49 @@
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const intersectionPoint = new THREE.Vector3();
             
-            if (raycaster.ray.intersectPlane(drawingPlane, intersectionPoint)) {
-                
-                // Optimization: Only add a new point if the mouse has moved a tiny bit away from the last point
+            // CHANGED: Instead of an infinite math plane, we test collisions 
+            // directly against our physical 8x8 yellow canvas mesh.
+            const intersects = raycaster.intersectObject(visualPlane);
+            
+            // Only draw if the raycaster laser actually hits the yellow square
+            if (intersects.length > 0) {
+                const intersectionPoint = intersects[0].point;
+
                 if (currentStrokePoints.length > 0) {
                     const lastPoint = currentStrokePoints[currentStrokePoints.length - 1];
-                    if (intersectionPoint.distanceTo(lastPoint) < 0.1) {
-                        return; // Mouse barely moved, don't waste memory
-                    }
+                    if (intersectionPoint.distanceTo(lastPoint) < 0.1) return;
                 }
 
                 currentStrokePoints.push(intersectionPoint.clone());
 
-                // We need at least 2 points to draw a line segment
                 if (currentStrokePoints.length > 1) {
-                    
-                    // Create a smooth mathematical curve passing through our array of points
                     const curve = new THREE.CatmullRomCurve3(currentStrokePoints);
-                    
-                    // Generate a 3D pipe geometry around that curve path
-                    // Parameters: (path, tubularSegments, radius, radialSegments, closed)
                     const geometry = new THREE.TubeGeometry(curve, currentStrokePoints.length * 2, 0.08, 8, false);
                     const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
 
-                    // Clean up the old segment before drawing the updated, longer version
                     if (currentStrokeMesh) {
                         scene.remove(currentStrokeMesh);
-                        currentStrokeMesh.geometry.dispose(); // Free up graphics card memory
+                        currentStrokeMesh.geometry.dispose();
                     }
 
-                    // Create the new mesh and add it to our scene
                     currentStrokeMesh = new THREE.Mesh(geometry, material);
                     scene.add(currentStrokeMesh);
                 }
             }
         }
 
-        // 7. Animation Loop
+        // 8. Animation Loop
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
+
+            // If the user isn't actively drawing, the sketchpad follows the camera angle
+            if (!isDrawing) {
+                visualPlane.position.copy(controls.target);
+                visualPlane.lookAt(camera.position);
+            }
+
             renderer.render(scene, camera);
         }
 
