@@ -20,6 +20,8 @@ pointer in the middle), and just by moving around in the world you change where 
   on that plane, then move it again when you want (eg. p for plane move)
 --- wasdrf maybe for plane move?
 
+
+- make it so you can toggle the plane or not
 - undo/redo
 
       

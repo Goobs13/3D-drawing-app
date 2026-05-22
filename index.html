@@ -72,13 +72,12 @@
 
         // 5. CHANGED: Shrunk PlaneGeometry from (25, 25) to (8, 8)
         const planeGeometry = new THREE.PlaneGeometry(8, 8);
-        const planeMaterial = new THREE.MeshStandardMaterial({
+        const planeMaterial = new THREE.MeshBasicMaterial({
             color: 0xffcc00,
             transparent: true,
-            opacity: 0.15,
+            opacity: 0.4,
             side: THREE.DoubleSide,
-            depthWrite: false,
-            roughness: 0.4
+            depthWrite: false
         });
         const visualPlane = new THREE.Mesh(planeGeometry, planeMaterial);
         scene.add(visualPlane);
