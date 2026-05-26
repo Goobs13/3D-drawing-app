@@ -124,6 +124,8 @@
     <div id="right-panel">
         <button id="save-json-btn" class="side-btn">Save Project</button>
         <button id="export-glb-btn" class="side-btn">Export 3D Asset</button>
+        <button id="import-btn" class="side-btn">Import Project</button>
+        <input type="file" id="file-input" accept=".json" style="display: none;">
     </div>
 
     <script type="importmap">
@@ -324,6 +326,66 @@
             }, (error) => {
                 console.error("An error occurred during GLTF export:", error);
             }, { binary: true });
+        });
+
+        // Trigger hidden file input when visible Import button is clicked
+        document.getElementById('import-btn').addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+
+        // Parse JSON file and recreate the 3D scene
+        document.getElementById('file-input').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (!Array.isArray(importedData)) return alert("Invalid file format.");
+
+                    // Wipe current drawings out of the scene & data array
+                    scene.children.slice().forEach(child => {
+                        if (child.isGroup) scene.remove(child);
+                    });
+                    masterProjectData.length = 0;
+
+                    // Rebuild meshes from coordinate array
+                    importedData.forEach(strokePointsData => {
+                        const reconstructedPoints = strokePointsData.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                        masterProjectData.push(reconstructedPoints);
+
+                        const strokeGroup = new THREE.Group();
+                        const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+
+                        const startGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                        const startSphere = new THREE.Mesh(startGeo, material);
+                        startSphere.position.copy(reconstructedPoints[0]);
+                        startSphere.name = "startSphere";
+                        strokeGroup.add(startSphere);
+
+                        if (reconstructedPoints.length > 1) {
+                            const curve = new THREE.CatmullRomCurve3(reconstructedPoints);
+                            const tubeGeometry = new THREE.TubeGeometry(curve, reconstructedPoints.length * 2, 0.08, 8, false);
+                            const tube = new THREE.Mesh(tubeGeometry, material);
+                            tube.name = "tube";
+                            strokeGroup.add(tube);
+
+                            const endGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                            const endSphere = new THREE.Mesh(endGeo, material);
+                            endSphere.position.copy(reconstructedPoints[reconstructedPoints.length - 1]);
+                            endSphere.name = "endSphere";
+                            strokeGroup.add(endSphere);
+                        }
+                        scene.add(strokeGroup);
+                    });
+
+                    event.target.value = ''; // Clear file input
+                } catch (err) {
+                    alert("Error loading the project file.");
+                }
+            };
+            reader.readAsText(file);
         });
 
         function addPoint(event) {
