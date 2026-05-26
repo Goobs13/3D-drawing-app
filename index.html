@@ -325,7 +325,11 @@
             if (event.button === 0) {
                 isDrawing = false;
                 if (currentStrokePoints.length > 0) {
-                    masterProjectData.push(currentStrokePoints);
+                    masterProjectData.push({
+                        points: currentStrokePoints,
+                        color: brushColor,
+                        thickness: brushThickness
+                    });
                     masterStrokeMeshes.push(currentStrokeMesh); // Track mesh components
                     redoStack.length = 0;                       // Clear redo stack on new stroke execution
                     hasUnsavedChanges = true; // Mark project as modified
@@ -449,27 +453,27 @@
         document.getElementById('redo-btn').addEventListener('click', () => {
             if (redoStack.length === 0) return;
 
-            const redonePoints = redoStack.pop();
-            masterProjectData.push(redonePoints);
+            const redoneStroke = redoStack.pop();
+            masterProjectData.push(redoneStroke);
 
             const strokeGroup = new THREE.Group();
-            const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+            const material = new THREE.MeshStandardMaterial({ color: redoneStroke.color, roughness: 0.3 });
 
-            const startGeo = new THREE.SphereGeometry(0.08, 8, 8);
+            const startGeo = new THREE.SphereGeometry(redoneStroke.thickness, 8, 8);
             const startSphere = new THREE.Mesh(startGeo, material);
-            startSphere.position.copy(redonePoints[0]);
+            startSphere.position.copy(redoneStroke.points[0]);
             strokeGroup.add(startSphere);
 
-            if (redonePoints.length > 1) {
-                const curve = new THREE.CatmullRomCurve3(redonePoints);
-                const tubeGeometry = new THREE.TubeGeometry(curve, redonePoints.length * 2, 0.08, 8, false);
+            if (redoneStroke.points.length > 1) {
+                const curve = new THREE.CatmullRomCurve3(redoneStroke.points);
+                const tubeGeometry = new THREE.TubeGeometry(curve, redoneStroke.points.length * 2, redoneStroke.thickness, 8, false);
                 const tube = new THREE.Mesh(tubeGeometry, material);
                 tube.name = "tube";
                 strokeGroup.add(tube);
 
-                const endGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                const endGeo = new THREE.SphereGeometry(redoneStroke.thickness, 8, 8);
                 const endSphere = new THREE.Mesh(endGeo, material);
-                endSphere.position.copy(redonePoints[redonePoints.length - 1]);
+                endSphere.position.copy(redoneStroke.points[redoneStroke.points.length - 1]);
                 strokeGroup.add(endSphere);
             }
 
@@ -666,34 +670,37 @@
                 redoStack.length = 0;          // NEW
 
                 // Re-instantiate meshes from vector data paths
-                strokesToLoad.forEach(strokePointsData => {
-                    const reconstructedPoints = strokePointsData.map(p => new THREE.Vector3(p.x, p.y, p.z));
-                    masterProjectData.push(reconstructedPoints);
+                strokesToLoad.forEach(strokeData => {
+                    const pointsArray = (strokeData.points || strokeData).map(p => new THREE.Vector3(p.x, p.y, p.z));
+                    const strokeColor = strokeData.color || '#00ff88';
+                    const strokeThickness = strokeData.thickness || 0.08;
+
+                    masterProjectData.push(strokeData.points ? strokeData : pointsArray);
 
                     const strokeGroup = new THREE.Group();
-                    const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+                    const material = new THREE.MeshStandardMaterial({ color: strokeColor, roughness: 0.3 });
 
-                    const startGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                    const startGeo = new THREE.SphereGeometry(strokeThickness, 8, 8);
                     const startSphere = new THREE.Mesh(startGeo, material);
-                    startSphere.position.copy(reconstructedPoints[0]);
+                    startSphere.position.copy(pointsArray[0]);
                     startSphere.name = "startSphere";
                     strokeGroup.add(startSphere);
 
-                    if (reconstructedPoints.length > 1) {
-                        const curve = new THREE.CatmullRomCurve3(reconstructedPoints);
-                        const tubeGeometry = new THREE.TubeGeometry(curve, reconstructedPoints.length * 2, 0.08, 8, false);
+                    if (pointsArray.length > 1) {
+                        const curve = new THREE.CatmullRomCurve3(pointsArray);
+                        const tubeGeometry = new THREE.TubeGeometry(curve, pointsArray.length * 2, strokeThickness, 8, false);
                         const tube = new THREE.Mesh(tubeGeometry, material);
                         tube.name = "tube";
                         strokeGroup.add(tube);
 
-                        const endGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                        const endGeo = new THREE.SphereGeometry(strokeThickness, 8, 8);
                         const endSphere = new THREE.Mesh(endGeo, material);
-                        endSphere.position.copy(reconstructedPoints[reconstructedPoints.length - 1]);
+                        endSphere.position.copy(pointsArray[pointsArray.length - 1]);
                         endSphere.name = "endSphere";
                         strokeGroup.add(endSphere);
                     }
                     scene.add(strokeGroup);
-                    masterStrokeMeshes.push(strokeGroup); // NEW: Track imported mesh components
+                    masterStrokeMeshes.push(strokeGroup);
                 });
 
                 hasUnsavedChanges = false;
