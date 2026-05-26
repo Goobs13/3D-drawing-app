@@ -110,6 +110,10 @@
             border-color: #00ff88;
         }
 
+        #undo-btn:hover, #redo-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00aaff; /* Blue highlight for history actions */
+        }
     </style>
 </head>
 <body>
@@ -128,6 +132,8 @@
     <div id="center-crosshair"></div>
     
     <div id="bottom-panel">
+        <button id="undo-btn" class="bottom-btn">Undo</button>
+        <button id="redo-btn" class="bottom-btn">Redo</button>
         <button id="reset-btn" class="bottom-btn">Reset Canvas</button>
         <button id="clear-btn" class="bottom-btn">Clear</button>
     </div>
@@ -246,6 +252,9 @@
 
         const masterProjectData = [];
 
+        const masterStrokeMeshes = []; // NEW: Tracks 3D meshes for undo operations
+        const redoStack = [];          // NEW: Holds popped stroke data arrays
+
         let hasUnsavedChanges = false; // Tracks if the user has unsaved work
 
         let fileHandle = null; // NEW: Remembers the saved file location
@@ -253,7 +262,7 @@
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
             // NEW: Ignore the click if the user is clicking on a UI element
-            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#reset-btn') || event.target.closest('#clear-btn')) {
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel')) {
                 return;
             }
             
@@ -270,6 +279,8 @@
                 isDrawing = false;
                 if (currentStrokePoints.length > 0) {
                     masterProjectData.push(currentStrokePoints);
+                    masterStrokeMeshes.push(currentStrokeMesh); // NEW: Track mesh components
+                    redoStack.length = 0;                       // NEW: Clear redo stack on new stroke execution
                     hasUnsavedChanges = true; // Mark project as modified
                 }
             }
@@ -353,9 +364,71 @@
 
                 // Reset all tracking matrices back to pristine state
                 masterProjectData.length = 0;
+                masterStrokeMeshes.length = 0; // NEW
+                redoStack.length = 0;          // NEW
                 fileHandle = null; 
                 hasUnsavedChanges = false; 
             }
+        });
+
+        // Undo the last drawn or redone stroke sequence safely
+        document.getElementById('undo-btn').addEventListener('click', () => {
+            if (masterProjectData.length === 0) return;
+
+            const undonePoints = masterProjectData.pop();
+            const undoneMesh = masterStrokeMeshes.pop();
+
+            redoStack.push(undonePoints); // Cache coordinates data
+
+            if (undoneMesh) {
+                undoneMesh.traverse((object) => {
+                    if (object.isMesh) {
+                        if (object.geometry) object.geometry.dispose();
+                        if (object.material) {
+                            if (Array.isArray(object.material)) {
+                                object.material.forEach(mat => mat.dispose());
+                            } else {
+                                object.material.dispose();
+                            }
+                        }
+                    }
+                });
+                scene.remove(undoneMesh);
+            }
+            hasUnsavedChanges = true;
+        });
+
+        // Redo the last reverted stroke structure natively
+        document.getElementById('redo-btn').addEventListener('click', () => {
+            if (redoStack.length === 0) return;
+
+            const redonePoints = redoStack.pop();
+            masterProjectData.push(redonePoints);
+
+            const strokeGroup = new THREE.Group();
+            const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+
+            const startGeo = new THREE.SphereGeometry(0.08, 8, 8);
+            const startSphere = new THREE.Mesh(startGeo, material);
+            startSphere.position.copy(redonePoints[0]);
+            strokeGroup.add(startSphere);
+
+            if (redonePoints.length > 1) {
+                const curve = new THREE.CatmullRomCurve3(redonePoints);
+                const tubeGeometry = new THREE.TubeGeometry(curve, redonePoints.length * 2, 0.08, 8, false);
+                const tube = new THREE.Mesh(tubeGeometry, material);
+                tube.name = "tube";
+                strokeGroup.add(tube);
+
+                const endGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                const endSphere = new THREE.Mesh(endGeo, material);
+                endSphere.position.copy(redonePoints[redonePoints.length - 1]);
+                strokeGroup.add(endSphere);
+            }
+
+            scene.add(strokeGroup);
+            masterStrokeMeshes.push(strokeGroup);
+            hasUnsavedChanges = true;
         });
 
         document.getElementById('save-json-btn').addEventListener('click', async () => {
@@ -532,6 +605,8 @@
                     }
                 });
                 masterProjectData.length = 0;
+                masterStrokeMeshes.length = 0; // NEW
+                redoStack.length = 0;          // NEW
 
                 // Re-instantiate meshes from vector data paths
                 strokesToLoad.forEach(strokePointsData => {
@@ -561,6 +636,7 @@
                         strokeGroup.add(endSphere);
                     }
                     scene.add(strokeGroup);
+                    masterStrokeMeshes.push(strokeGroup); // NEW: Track imported mesh components
                 });
 
                 hasUnsavedChanges = false;
