@@ -24,4 +24,9 @@ pointer in the middle), and just by moving around in the world you change where 
 - make it so you can toggle the plane or not
 - undo/redo
 
+
+- more responsive scroll
+- undo button
+- clear button
+
       

@@ -390,9 +390,24 @@
                     const importedData = JSON.parse(e.target.result);
                     if (!Array.isArray(importedData)) return alert("Invalid file format.");
 
-                    // Wipe current drawings out of the scene & data array
+                    // Wipe current drawings out of the scene, clearing GPU memory first
                     scene.children.slice().forEach(child => {
-                        if (child.isGroup) scene.remove(child);
+                        if (child.isGroup) {
+                            // Traverse the group to find meshes and dispose of their assets
+                            child.traverse((object) => {
+                                if (object.isMesh) {
+                                    if (object.geometry) object.geometry.dispose();
+                                    if (object.material) {
+                                        if (Array.isArray(object.material)) {
+                                            object.material.forEach(mat => mat.dispose());
+                                        } else {
+                                            object.material.dispose();
+                                        }
+                                    }
+                                }
+                            });
+                            scene.remove(child);
+                        }
                     });
                     masterProjectData.length = 0;
 
