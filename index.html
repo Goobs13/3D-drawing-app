@@ -95,16 +95,10 @@
         </p>
     </div>
 
-    <div id="toolbar">
-        <button class="tool-btn" id="tool-select" title="Select">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg>
-        </button>
-        <button class="tool-btn" id="tool-move" title="Move">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5v14M12 5l-3 3m3-3l3 3M12 19l-3-3m3 3l3-3M5 12l3-3m-3 3l3 3M19 12l-3-3m3 3l3-3"/></svg>
-        </button>
-        <button class="tool-btn active" id="tool-draw" title="Draw">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="M19 17c-2.5 0-4 1.5-6 1.5s-3.5-1.5-6-1.5" opacity="0.6"/></svg>
-        </button>
+    <div id="toolbar" style="font-family: sans-serif; font-weight: bold; font-size: 14px;">
+        <button class="tool-btn active" id="tool-draw" title="Draw">Draw</button>
+        <button class="tool-btn" id="tool-rotate" title="Rotate Plane">Rotate Plane</button>
+        <button class="tool-btn" id="tool-select" title="Select">Select</button>
     </div>
 
     <div id="center-crosshair"></div>
@@ -196,13 +190,14 @@
         let activeTool = 'draw'; 
 
         const toolButtons = {
-            select: document.getElementById('tool-select'),
-            move: document.getElementById('tool-move'),
-            draw: document.getElementById('tool-draw')
+            draw: document.getElementById('tool-draw'),
+            rotate: document.getElementById('tool-rotate'),
+            select: document.getElementById('tool-select')
         };
 
         function changeTool(toolName) {
             activeTool = toolName;
+            
             // Loop through buttons to toggle the 'active' highlight class
             Object.keys(toolButtons).forEach(key => {
                 if (key === toolName) {
@@ -213,7 +208,7 @@
             });
 
             // Remap camera controls based on the active tool
-            if (activeTool === 'move') {
+            if (activeTool === 'rotate') {
                 controls.mouseButtons.LEFT = THREE.MOUSE.PAN;     // Left click pans the scene
                 controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;  // Right click rotates
             } else {
@@ -222,9 +217,9 @@
             }
         }
 
-        toolButtons.select.addEventListener('click', () => changeTool('select'));
-        toolButtons.move.addEventListener('click', () => changeTool('move'));
         toolButtons.draw.addEventListener('click', () => changeTool('draw'));
+        toolButtons.rotate.addEventListener('click', () => changeTool('rotate'));
+        toolButtons.select.addEventListener('click', () => changeTool('select'));
 
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
@@ -262,6 +257,28 @@
                 drawingHeight -= elevatorSpeed;
             }
         }, { capture: true }); // 'capture' ensures we catch the scroll before OrbitControls does
+
+        // Arrow keys rotate strictly along the canvas's internal center lines (local axes)
+        window.addEventListener('keydown', (event) => {
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+            event.preventDefault(); 
+
+            const rotationSpeed = 0.04; 
+
+            if (event.key === 'ArrowUp') {
+                // Rotates around the canvas's local horizontal axis
+                visualPlane.rotateX(-rotationSpeed);
+            } else if (event.key === 'ArrowDown') {
+                // Rotates around the canvas's local horizontal axis
+                visualPlane.rotateX(rotationSpeed);
+            } else if (event.key === 'ArrowLeft') {
+                // Rotates around the canvas's local vertical axis
+                visualPlane.rotateY(-rotationSpeed);
+            } else if (event.key === 'ArrowRight') {
+                // Rotates around the canvas's local vertical axis
+                visualPlane.rotateY(rotationSpeed);
+            }
+        });
 
         function addPoint(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
