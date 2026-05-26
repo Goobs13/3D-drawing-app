@@ -158,6 +158,33 @@
             border-color: #00d5ff;
         }
 
+        /* Lower Right Recent Colors Panel Style */
+        #recent-colors-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(30, 30, 30, 0.85);
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 12px;
+            color: white;
+            font-family: sans-serif;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 140px;
+            pointer-events: auto;
+        }
+        #recent-colors-panel h4 { margin: 0 0 10px 0; font-size: 12px; text-align: center; color: #ccc; text-transform: uppercase; letter-spacing: 0.5px; }
+        #colors-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .color-swatch {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            cursor: pointer;
+            transition: transform 0.1s ease, border-color 0.1s ease;
+        }
+        .color-swatch:hover { transform: scale(1.15); border-color: #ffffff; }
+
     </style>
 </head>
 <body>
@@ -203,6 +230,11 @@
         <button id="save-json-btn" class="side-btn">Save Project</button>
         <button id="export-glb-btn" class="side-btn">Export 3D Mesh</button>
         <button id="import-btn" class="side-btn">Import Project</button>
+    </div>
+
+    <div id="recent-colors-panel">
+        <h4>Recent Colors</h4>
+        <div id="colors-grid"></div>
     </div>
 
     <script type="importmap">
@@ -327,7 +359,7 @@
 
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
-            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel') || event.target.closest('#tools-menu')) {
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel') || event.target.closest('#tools-menu')|| event.target.closest('#recent-colors-panel')) {
                 return;
             }
             
@@ -365,7 +397,7 @@
 
         window.addEventListener('pointerup', (event) => {
             // NEW: Ignore mouse releases over UI panels so they don't corrupt history stacks
-            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel') || event.target.closest('#tools-menu')) {
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel') || event.target.closest('#tools-menu')|| event.target.closest('#recent-colors-panel')) {
                 isDrawing = false;
                 return;
             }
@@ -582,7 +614,10 @@
         });
 
         // Track pickers and sliders configuration changes
-        document.getElementById('brush-color').addEventListener('input', (e) => brushColor = e.target.value);
+        document.getElementById('brush-color').addEventListener('input', (e) => {
+            brushColor = e.target.value;
+            pushRecentColor(e.target.value);
+        });
         document.getElementById('brush-thickness').addEventListener('input', (e) => brushThickness = parseFloat(e.target.value));
 
         // Swap workspace pipeline paths back to vector line compilation mechanics
@@ -886,6 +921,51 @@
                 }
             }
         }
+
+        // Recent Colors state configuration parameters
+        const recentColorsList = ['#00ff88']; // Start with your baseline canvas green
+        const maxHistorySwatches = 12;
+
+        // Add a new color selection or push existing items directly to the front
+        function pushRecentColor(hexColor) {
+            if (recentColorsList[0] === hexColor) return; // Prevent spamming duplicate history records
+
+            const existingIndex = recentColorsList.indexOf(hexColor);
+            if (existingIndex !== -1) {
+                recentColorsList.splice(existingIndex, 1); // Extract old index instance
+            }
+
+            recentColorsList.unshift(hexColor); // Push onto front row stack slot
+
+            if (recentColorsList.length > maxHistorySwatches) {
+                recentColorsList.pop(); // Drop overflowing historical items
+            }
+
+            renderColorsPalette();
+        }
+
+        // Generate structural interactive canvas elements inside document DOM space maps
+        function renderColorsPalette() {
+            const paletteGrid = document.getElementById('colors-grid');
+            paletteGrid.innerHTML = ''; // Wipe stale layout states
+
+            recentColorsList.forEach(colorHex => {
+                const swatchElement = document.createElement('div');
+                swatchElement.className = 'color-swatch';
+                swatchElement.style.backgroundColor = colorHex;
+
+                // Sync engine selections automatically when swatch is clicked
+                swatchElement.addEventListener('click', () => {
+                    brushColor = colorHex;
+                    document.getElementById('brush-color').value = colorHex; // Sync floating tools picker
+                });
+
+                paletteGrid.appendChild(swatchElement);
+            });
+        }
+
+        // Trigger an initial paint to populate default baseline palette matrix
+        renderColorsPalette();
 
         // 8. Animation Loop
         function animate() {
