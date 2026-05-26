@@ -114,6 +114,33 @@
             background: rgba(255, 255, 255, 0.1);
             border-color: #00aaff; /* Blue highlight for history actions */
         }
+
+        #tools-menu {
+            position: absolute;
+            bottom: 85px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 30, 30, 0.95);
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 16px;
+            color: white;
+            font-family: sans-serif;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            width: 220px;
+            pointer-events: auto;
+        }
+        #tools-menu h3 { margin: 0 0 4px 0; font-size: 16px; border-bottom: 1px solid #444; padding-bottom: 6px; }
+        .menu-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .menu-row label { font-size: 13px; font-weight: bold; color: #ccc; }
+        #tools-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #00ff88;
+        }
+
     </style>
 </head>
 <body>
@@ -132,10 +159,23 @@
     <div id="center-crosshair"></div>
     
     <div id="bottom-panel">
+        <button id="tools-btn" class="bottom-btn">Tools</button>
         <button id="undo-btn" class="bottom-btn">Undo</button>
         <button id="redo-btn" class="bottom-btn">Redo</button>
         <button id="reset-btn" class="bottom-btn">Reset Canvas</button>
         <button id="clear-btn" class="bottom-btn">Clear</button>
+    </div>
+
+    <div id="tools-menu" style="display: none;">
+        <h3>Tool Settings</h3>
+        <div class="menu-row">
+            <label>Color:</label>
+            <input type="color" id="brush-color" value="#00ff88">
+        </div>
+        <div class="menu-row">
+            <label>Thickness:</label>
+            <input type="range" id="brush-thickness" min="0.02" max="0.3" step="0.01" value="0.08">
+        </div>
     </div>
 
     <div id="right-panel">
@@ -252,6 +292,10 @@
         const masterStrokeMeshes = []; // NEW: Tracks 3D meshes for undo operations
         const redoStack = [];          // NEW: Holds popped stroke data arrays
 
+        // NEW: Dynamic brush state tracking variables
+        let brushColor = '#00ff88';
+        let brushThickness = 0.08;
+
         let hasUnsavedChanges = false; // Tracks if the user has unsaved work
 
         let fileHandle = null; // NEW: Remembers the saved file location
@@ -259,7 +303,7 @@
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
             // NEW: Ignore the click if the user is clicking on a UI element
-            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel')) {
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel') || event.target.closest('#tools-menu')) {
                 return;
             }
             
@@ -273,7 +317,7 @@
 
         window.addEventListener('pointerup', (event) => {
             // NEW: Ignore mouse releases over UI panels so they don't corrupt history stacks
-            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel')) {
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel') || event.target.closest('#tools-menu')) {
                 isDrawing = false;
                 return;
             }
@@ -433,6 +477,16 @@
             masterStrokeMeshes.push(strokeGroup);
             hasUnsavedChanges = true;
         });
+
+        // Toggle tool configuration layout visibility
+        document.getElementById('tools-btn').addEventListener('click', () => {
+            const menu = document.getElementById('tools-menu');
+            menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+        });
+
+        // Track pickers and sliders configuration changes
+        document.getElementById('brush-color').addEventListener('input', (e) => brushColor = e.target.value);
+        document.getElementById('brush-thickness').addEventListener('input', (e) => brushThickness = parseFloat(e.target.value));
 
         document.getElementById('save-json-btn').addEventListener('click', async () => {
             if (masterProjectData.length === 0) return alert("Nothing to save yet!");
@@ -669,46 +723,43 @@
 
                 currentStrokePoints.push(intersectionPoint.clone());
 
-                const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+                // 1. Swap hardcoded hex code with brushColor variable
+                const material = new THREE.MeshStandardMaterial({ color: brushColor, roughness: 0.3 });
 
-                // 1. First click: Create a container Group and drop the starting sphere inside
                 if (currentStrokePoints.length === 1) {
                     currentStrokeMesh = new THREE.Group(); 
                     scene.add(currentStrokeMesh);
 
-                    const geometry = new THREE.SphereGeometry(0.08, 8, 8);
+                    // 2. Swap starting sphere radius with brushThickness
+                    const geometry = new THREE.SphereGeometry(brushThickness, 8, 8);
                     const startSphere = new THREE.Mesh(geometry, material);
                     startSphere.position.copy(intersectionPoint);
                     startSphere.name = "startSphere";
                     
                     currentStrokeMesh.add(startSphere);
                 } 
-                // 2. Dragging: Keep the start sphere, update the tube, and update the end sphere
                 else if (currentStrokePoints.length > 1) {
-                    
-                    // Find and clean up the old tube mesh from the previous frame
                     const oldTube = currentStrokeMesh.getObjectByName("tube");
                     if (oldTube) {
                         currentStrokeMesh.remove(oldTube);
                         oldTube.geometry.dispose();
                     }
 
-                    // Find and clean up the old end sphere from the previous frame
                     const oldEndSphere = currentStrokeMesh.getObjectByName("endSphere");
                     if (oldEndSphere) {
                         currentStrokeMesh.remove(oldEndSphere);
                         oldEndSphere.geometry.dispose();
                     }
 
-                    // Build the updated tube geometry across all accumulated points
                     const curve = new THREE.CatmullRomCurve3(currentStrokePoints);
-                    const tubeGeometry = new THREE.TubeGeometry(curve, currentStrokePoints.length * 2, 0.08, 8, false);
+                    // 3. Swap tube geometry thickness with brushThickness
+                    const tubeGeometry = new THREE.TubeGeometry(curve, currentStrokePoints.length * 2, brushThickness, 8, false);
                     const tube = new THREE.Mesh(tubeGeometry, material);
                     tube.name = "tube";
                     currentStrokeMesh.add(tube);
 
-                    // Build a brand new end sphere at the latest point
-                    const sphereGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+                    // 4. Swap trailing ending sphere radius with brushThickness
+                    const sphereGeometry = new THREE.SphereGeometry(brushThickness, 8, 8);
                     const endSphere = new THREE.Mesh(sphereGeometry, material);
                     endSphere.position.copy(intersectionPoint);
                     endSphere.name = "endSphere";
