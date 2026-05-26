@@ -125,7 +125,6 @@
         <button id="save-json-btn" class="side-btn">Save Project</button>
         <button id="export-glb-btn" class="side-btn">Export 3D Asset</button>
         <button id="import-btn" class="side-btn">Import Project</button>
-        <input type="file" id="file-input" accept=".json" style="display: none;">
     </div>
 
     <script type="importmap">
@@ -387,105 +386,125 @@
             }, { binary: true });
         });
 
-        // Trigger hidden file input when visible Import button is clicked
-        document.getElementById('import-btn').addEventListener('click', () => {
-            document.getElementById('file-input').click();
+        // Load an existing project and lock onto its hardware file path
+        document.getElementById('import-btn').addEventListener('click', async () => {
+            if ('showOpenFilePicker' in window) {
+                try {
+                    // Open a native system file browser
+                    const [handle] = await window.showOpenFilePicker({
+                        types: [{
+                            description: 'JSON Files',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    
+                    const file = await handle.getFile();
+                    const text = await file.text();
+                    
+                    // Run the rendering pipeline on the JSON data
+                    processImportedProject(text);
+                    
+                    // CRITICAL FIX: Lock the app's save tracking pointer onto this file path
+                    fileHandle = handle; 
+                    
+                } catch (err) {
+                    if (err.name !== 'AbortError') alert("Error opening project file.");
+                }
+            } else {
+                // Backward compatibility fallback for older browsers
+                const legacyInput = document.createElement('input');
+                legacyInput.type = 'file';
+                legacyInput.accept = '.json';
+                legacyInput.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        processImportedProject(evt.target.result);
+                        fileHandle = null; 
+                    };
+                    reader.readAsText(file);
+                };
+                legacyInput.click();
+            }
         });
 
-        // Parse JSON file and recreate the 3D scene
-        document.getElementById('file-input').addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
+        // Pipeline to parse JSON structures and regenerate 3D canvas meshes
+        function processImportedProject(jsonText) {
+            try {
+                const importedData = JSON.parse(jsonText);
+                let strokesToLoad = [];
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    let strokesToLoad = [];
+                if (importedData.canvas && Array.isArray(importedData.strokes)) {
+                    drawingHeight = importedData.canvas.height;
+                    visualPlane.position.y = drawingHeight;
+                    visualPlane.rotation.set(
+                        importedData.canvas.rotation.x,
+                        importedData.canvas.rotation.y,
+                        importedData.canvas.rotation.z
+                    );
+                    strokesToLoad = importedData.strokes;
+                } else if (Array.isArray(importedData)) {
+                    strokesToLoad = importedData;
+                } else {
+                    return alert("Invalid file format.");
+                }
 
-                    // Check if the file uses our new canvas-tracking format
-                    if (importedData.canvas && Array.isArray(importedData.strokes)) {
-                        // Restore canvas height
-                        drawingHeight = importedData.canvas.height;
-                        visualPlane.position.y = drawingHeight;
-                        
-                        // Restore canvas rotation angles
-                        visualPlane.rotation.set(
-                            importedData.canvas.rotation.x,
-                            importedData.canvas.rotation.y,
-                            importedData.canvas.rotation.z
-                        );
-                        
-                        strokesToLoad = importedData.strokes;
-                    } 
-                    // Fallback baseline for older legacy files that only contain raw arrays
-                    else if (Array.isArray(importedData)) {
-                        strokesToLoad = importedData;
-                    } 
-                    else {
-                        return alert("Invalid file format.");
-                    }
-
-                    // Wipe current drawings out of the scene, clearing GPU memory first
-                    scene.children.slice().forEach(child => {
-                        if (child.isGroup) {
-                            child.traverse((object) => {
-                                if (object.isMesh) {
-                                    if (object.geometry) object.geometry.dispose();
-                                    if (object.material) {
-                                        if (Array.isArray(object.material)) {
-                                            object.material.forEach(mat => mat.dispose());
-                                        } else {
-                                            object.material.dispose();
-                                        }
+                // Empty out old meshes and purge GPU resources
+                scene.children.slice().forEach(child => {
+                    if (child.isGroup) {
+                        child.traverse((object) => {
+                            if (object.isMesh) {
+                                if (object.geometry) object.geometry.dispose();
+                                if (object.material) {
+                                    if (Array.isArray(object.material)) {
+                                        object.material.forEach(mat => mat.dispose());
+                                    } else {
+                                        object.material.dispose();
                                     }
                                 }
-                            });
-                            scene.remove(child);
-                        }
-                    });
-                    masterProjectData.length = 0;
-                    fileHandle = null;
+                            }
+                        });
+                        scene.remove(child);
+                    }
+                });
+                masterProjectData.length = 0;
 
-                    // Rebuild meshes from coordinate array
-                    strokesToLoad.forEach(strokePointsData => {
-                        const reconstructedPoints = strokePointsData.map(p => new THREE.Vector3(p.x, p.y, p.z));
-                        masterProjectData.push(reconstructedPoints);
+                // Re-instantiate meshes from vector data paths
+                strokesToLoad.forEach(strokePointsData => {
+                    const reconstructedPoints = strokePointsData.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                    masterProjectData.push(reconstructedPoints);
 
-                        const strokeGroup = new THREE.Group();
-                        const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+                    const strokeGroup = new THREE.Group();
+                    const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
 
-                        const startGeo = new THREE.SphereGeometry(0.08, 8, 8);
-                        const startSphere = new THREE.Mesh(startGeo, material);
-                        startSphere.position.copy(reconstructedPoints[0]);
-                        startSphere.name = "startSphere";
-                        strokeGroup.add(startSphere);
+                    const startGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                    const startSphere = new THREE.Mesh(startGeo, material);
+                    startSphere.position.copy(reconstructedPoints[0]);
+                    startSphere.name = "startSphere";
+                    strokeGroup.add(startSphere);
 
-                        if (reconstructedPoints.length > 1) {
-                            const curve = new THREE.CatmullRomCurve3(reconstructedPoints);
-                            const tubeGeometry = new THREE.TubeGeometry(curve, reconstructedPoints.length * 2, 0.08, 8, false);
-                            const tube = new THREE.Mesh(tubeGeometry, material);
-                            tube.name = "tube";
-                            strokeGroup.add(tube);
+                    if (reconstructedPoints.length > 1) {
+                        const curve = new THREE.CatmullRomCurve3(reconstructedPoints);
+                        const tubeGeometry = new THREE.TubeGeometry(curve, reconstructedPoints.length * 2, 0.08, 8, false);
+                        const tube = new THREE.Mesh(tubeGeometry, material);
+                        tube.name = "tube";
+                        strokeGroup.add(tube);
 
-                            const endGeo = new THREE.SphereGeometry(0.08, 8, 8);
-                            const endSphere = new THREE.Mesh(endGeo, material);
-                            endSphere.position.copy(reconstructedPoints[reconstructedPoints.length - 1]);
-                            endSphere.name = "endSphere";
-                            strokeGroup.add(endSphere);
-                        }
-                        scene.add(strokeGroup);
-                    });
+                        const endGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                        const endSphere = new THREE.Mesh(endGeo, material);
+                        endSphere.position.copy(reconstructedPoints[reconstructedPoints.length - 1]);
+                        endSphere.name = "endSphere";
+                        strokeGroup.add(endSphere);
+                    }
+                    scene.add(strokeGroup);
+                });
 
-                    hasUnsavedChanges = false; // Freshly imported project has no new changes
-
-                    event.target.value = ''; // Clear file input
-                } catch (err) {
-                    alert("Error loading the project file.");
-                }
-            };
-            reader.readAsText(file);
-        });
+                hasUnsavedChanges = false;
+            } catch (err) {
+                alert("Error rendering the imported project configuration.");
+            }
+        }
 
         function addPoint(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
