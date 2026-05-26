@@ -365,7 +365,12 @@
             // Bundle canvas settings and drawing data together
             const projectSaveData = {
                 canvas: {
-                    height: drawingHeight,
+                    // FIXED: Save the true X, Y, Z coordinates of the canvas position
+                    position: {
+                        x: visualPlane.position.x,
+                        y: visualPlane.position.y,
+                        z: visualPlane.position.z
+                    },
                     rotation: {
                         x: visualPlane.rotation.x,
                         y: visualPlane.rotation.y,
@@ -486,8 +491,17 @@
                 let strokesToLoad = [];
 
                 if (importedData.canvas && Array.isArray(importedData.strokes)) {
-                    drawingHeight = importedData.canvas.height;
-                    visualPlane.position.y = drawingHeight;
+                    // FIXED: Restore full 3D position vector if it exists, otherwise fall back to legacy height
+                    if (importedData.canvas.position) {
+                        visualPlane.position.set(
+                            importedData.canvas.position.x,
+                            importedData.canvas.position.y,
+                            importedData.canvas.position.z
+                        );
+                    } else if (importedData.canvas.height !== undefined) {
+                        visualPlane.position.set(0, importedData.canvas.height, 0);
+                    }
+                    
                     visualPlane.rotation.set(
                         importedData.canvas.rotation.x,
                         importedData.canvas.rotation.y,
