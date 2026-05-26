@@ -237,6 +237,8 @@
 
         let hasUnsavedChanges = false; // Tracks if the user has unsaved work
 
+        let fileHandle = null; // NEW: Remembers the saved file location
+
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
             if (event.button === 0) { 
@@ -308,16 +310,47 @@
             visualPlane.rotation.set(-Math.PI / 2, 0, 0);
         });
 
-        document.getElementById('save-json-btn').addEventListener('click', () => {
+        document.getElementById('save-json-btn').addEventListener('click', async () => {
             if (masterProjectData.length === 0) return alert("Nothing to save yet!");
             const jsonString = JSON.stringify(masterProjectData);
-            const blob = new Blob([jsonString], { type: "application/json" });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = "my-3d-drawing-project.json";
-            link.click();
 
-            hasUnsavedChanges = false; // Saved successfully
+            // Check if the browser supports the File System Access API
+            if ('showSaveFilePicker' in window) {
+                try {
+                    // If we don't have a handle yet, prompt the user to choose a location
+                    if (!fileHandle) {
+                        const options = {
+                            suggestedName: 'my-3d-drawing-project.json',
+                            types: [{
+                                description: 'JSON Files',
+                                accept: { 'application/json': ['.json'] }
+                            }]
+                        };
+                        fileHandle = await window.showSaveFilePicker(options);
+                    }
+
+                    // Write directly to the existing file handle
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(jsonString);
+                    await writable.close();
+
+                    hasUnsavedChanges = false;
+                    alert("Project updated successfully!");
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error(err);
+                        alert("Failed to save file.");
+                    }
+                }
+            } else {
+                // Fallback for older browsers (always downloads a new file)
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = "my-3d-drawing-project.json";
+                link.click();
+                hasUnsavedChanges = false;
+            }
         });
 
         document.getElementById('export-glb-btn').addEventListener('click', () => {
