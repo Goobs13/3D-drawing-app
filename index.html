@@ -166,6 +166,7 @@
         // 2. Setup Camera Controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+        controls.zoomSpeed = 1.8; // NEW: Values higher than 1.0 make zooming faster
         controls.screenSpacePanning = false; // Locks standard panning to X and Z axes
         controls.mouseButtons = {
             LEFT: THREE.MOUSE.NONE,
@@ -190,7 +191,7 @@
         const planeMaterial = new THREE.MeshBasicMaterial({
             color: 0xffcc00,
             transparent: true,
-            opacity: 0.4,
+            opacity: 0.3,
             side: THREE.DoubleSide,
             depthWrite: false
         });
