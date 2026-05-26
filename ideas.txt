@@ -27,6 +27,13 @@ pointer in the middle), and just by moving around in the world you change where 
 
 - more responsive scroll
 - undo button
-- clear button
+- clear button + "are you sure you want to clear?"
+- change color, size
+- shift scroll should move it perpendicular to the canvas?
+- whe you hover over the save buttons it tells you hwat it does
 
+- SEO optimized website
+- digital advertising (advertise 3D drawing app)
+- website link + description
+- logo/thumbnail
       

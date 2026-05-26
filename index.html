@@ -278,8 +278,8 @@
                 // Adjust sensitivity (smaller number = slower, smoother movement)
                 const elevatorSpeed = event.deltaY * 0.001; 
 
-                // Adjust only our independent height variable
-                drawingHeight -= elevatorSpeed;
+                // NEW: Translates the plane along its perpendicular local Z-axis
+                visualPlane.translateZ(-elevatorSpeed);
             }
         }, { capture: true }); // 'capture' ensures we catch the scroll before OrbitControls does
 
@@ -308,7 +308,8 @@
 
         // Reset button logic to clear canvas height and rotation orientation
         document.getElementById('reset-btn').addEventListener('click', () => {
-            drawingHeight = 0.01;
+            // NEW: Resets X, Y, and Z positions entirely
+            visualPlane.position.set(0, 0.01, 0);
             
             // Re-align canvas flat against the grid floor
             visualPlane.rotation.set(-Math.PI / 2, 0, 0);
@@ -601,9 +602,6 @@
             if (keysPressed['ArrowRight']) {
                 visualPlane.rotateY(frameRotationSpeed);
             }
-
-            // Keeps the yellow pad locked to our independent height variable
-            visualPlane.position.y = drawingHeight;
             
             renderer.render(scene, camera);
         }
