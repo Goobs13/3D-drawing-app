@@ -109,7 +109,7 @@
     <div id="ui-overlay">
         <h1>3D Bounded Sketchpad</h1>
         <p>
-            Left Click + Drag: <b>Draw inside the yellow pad</b><br>
+            Left Click + Drag: <b>Draw inside the yellow canvas</b><br>
             Right Click + Drag: <b>Orbit Camera</b><br>
             Shift + Right Click: <b>Pan Camera</b><br>
             Shift + Scroll: <b>Change canvas height</b><br>
@@ -312,7 +312,20 @@
 
         document.getElementById('save-json-btn').addEventListener('click', async () => {
             if (masterProjectData.length === 0) return alert("Nothing to save yet!");
-            const jsonString = JSON.stringify(masterProjectData);
+            
+            // Bundle canvas settings and drawing data together
+            const projectSaveData = {
+                canvas: {
+                    height: drawingHeight,
+                    rotation: {
+                        x: visualPlane.rotation.x,
+                        y: visualPlane.rotation.y,
+                        z: visualPlane.rotation.z
+                    }
+                },
+                strokes: masterProjectData
+            };
+            const jsonString = JSON.stringify(projectSaveData);
 
             // Check if the browser supports the File System Access API
             if ('showSaveFilePicker' in window) {
@@ -388,12 +401,34 @@
             reader.onload = (e) => {
                 try {
                     const importedData = JSON.parse(e.target.result);
-                    if (!Array.isArray(importedData)) return alert("Invalid file format.");
+                    let strokesToLoad = [];
+
+                    // Check if the file uses our new canvas-tracking format
+                    if (importedData.canvas && Array.isArray(importedData.strokes)) {
+                        // Restore canvas height
+                        drawingHeight = importedData.canvas.height;
+                        visualPlane.position.y = drawingHeight;
+                        
+                        // Restore canvas rotation angles
+                        visualPlane.rotation.set(
+                            importedData.canvas.rotation.x,
+                            importedData.canvas.rotation.y,
+                            importedData.canvas.rotation.z
+                        );
+                        
+                        strokesToLoad = importedData.strokes;
+                    } 
+                    // Fallback baseline for older legacy files that only contain raw arrays
+                    else if (Array.isArray(importedData)) {
+                        strokesToLoad = importedData;
+                    } 
+                    else {
+                        return alert("Invalid file format.");
+                    }
 
                     // Wipe current drawings out of the scene, clearing GPU memory first
                     scene.children.slice().forEach(child => {
                         if (child.isGroup) {
-                            // Traverse the group to find meshes and dispose of their assets
                             child.traverse((object) => {
                                 if (object.isMesh) {
                                     if (object.geometry) object.geometry.dispose();
@@ -410,11 +445,10 @@
                         }
                     });
                     masterProjectData.length = 0;
-
-                    fileHandle = null; // Forgets the old file location so you don't overwrite it!
+                    fileHandle = null;
 
                     // Rebuild meshes from coordinate array
-                    importedData.forEach(strokePointsData => {
+                    strokesToLoad.forEach(strokePointsData => {
                         const reconstructedPoints = strokePointsData.map(p => new THREE.Vector3(p.x, p.y, p.z));
                         masterProjectData.push(reconstructedPoints);
 
