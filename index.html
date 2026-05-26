@@ -244,9 +244,6 @@
         let currentStrokePoints = [];
         let currentStrokeMesh = null;
 
-        // NEW: Independent altitude tracker for the sketchpad
-        let drawingHeight = 0.01;
-
         // Tracks which arrow keys are currently being held down
         const keysPressed = {};
 
@@ -275,12 +272,18 @@
         });
 
         window.addEventListener('pointerup', (event) => {
+            // NEW: Ignore mouse releases over UI panels so they don't corrupt history stacks
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel')) {
+                isDrawing = false;
+                return;
+            }
+
             if (event.button === 0) {
                 isDrawing = false;
                 if (currentStrokePoints.length > 0) {
                     masterProjectData.push(currentStrokePoints);
-                    masterStrokeMeshes.push(currentStrokeMesh); // NEW: Track mesh components
-                    redoStack.length = 0;                       // NEW: Clear redo stack on new stroke execution
+                    masterStrokeMeshes.push(currentStrokeMesh); // Track mesh components
+                    redoStack.length = 0;                       // Clear redo stack on new stroke execution
                     hasUnsavedChanges = true; // Mark project as modified
                 }
             }
