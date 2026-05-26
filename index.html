@@ -48,12 +48,17 @@
             background-color: #ffffff;
         }
 
-        /* Bottom Center Reset Button Styling */
-        #reset-btn {
+        /* Bottom Center Panel Styling */
+        #bottom-panel {
             position: absolute;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+        }
+        .bottom-btn {
             background: rgba(30, 30, 30, 0.85);
             border: 1px solid #444;
             border-radius: 8px;
@@ -63,13 +68,16 @@
             font-family: sans-serif;
             font-weight: bold;
             font-size: 14px;
-            pointer-events: auto;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: background 0.2s ease;
+            transition: all 0.2s ease;
         }
         #reset-btn:hover {
             background: rgba(255, 255, 255, 0.1);
-            border-color: #ffcc00;
+            border-color: #ffcc00; /* Yellow highlight for return */
+        }
+        #clear-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #ff4444; /* Red highlight for clear */
         }
 
         /* Top Right Save Panel Styling */
@@ -119,7 +127,10 @@
 
     <div id="center-crosshair"></div>
     
-    <button id="reset-btn">Reset Canvas</button>
+    <div id="bottom-panel">
+        <button id="reset-btn" class="bottom-btn">Return Canvas</button>
+        <button id="clear-btn" class="bottom-btn">Clear Canvas</button>
+    </div>
 
     <div id="right-panel">
         <button id="save-json-btn" class="side-btn">Save Project</button>
@@ -241,7 +252,7 @@
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
             // NEW: Ignore the click if the user is clicking on a UI element
-            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#reset-btn')) {
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#reset-btn') || event.target.closest('#clear-btn')) {
                 return;
             }
             
@@ -313,6 +324,39 @@
             
             // Re-align canvas flat against the grid floor
             visualPlane.rotation.set(-Math.PI / 2, 0, 0);
+        });
+
+        // Clear all artwork from the workspace after confirmation pass
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            if (masterProjectData.length === 0) return alert("Canvas is already empty!");
+
+            if (confirm("Are you sure you want to clear everything?")) {
+                // Wipe current drawings out of the scene, clearing GPU memory first
+                scene.children.slice().forEach(child => {
+                    if (child.isGroup) {
+                        child.traverse((object) => {
+                            if (object.isMesh) {
+                                if (object.geometry) object.geometry.dispose();
+                                if (object.material) {
+                                    if (Array.isArray(object.material)) {
+                                        object.material.forEach(mat => mat.dispose());
+                                    } else {
+                                        object.material.dispose();
+                                    }
+                                }
+                            }
+                        });
+                        scene.remove(child);
+                    }
+                });
+
+                // Reset all tracking matrices back to pristine state
+                masterProjectData.length = 0;
+                fileHandle = null; 
+                hasUnsavedChanges = false; 
+                
+                alert("Canvas cleared!");
+            }
         });
 
         document.getElementById('save-json-btn').addEventListener('click', async () => {
