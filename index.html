@@ -75,11 +75,13 @@
         const planeMaterial = new THREE.MeshBasicMaterial({
             color: 0xffcc00,
             transparent: true,
-            opacity: 0.4,
+            opacity: 0.6,
             side: THREE.DoubleSide,
             depthWrite: false
         });
         const visualPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+        visualPlane.rotation.x = -Math.PI / 2; // Rotates it flat like a floor
+        visualPlane.position.y = 0.01;         // Sits slightly above the grid to avoid flickering
         scene.add(visualPlane);
 
         // Create a sharp, less transparent border around the edges
@@ -165,13 +167,7 @@
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
-
-            // If the user isn't actively drawing, the sketchpad follows the camera angle
-            if (!isDrawing) {
-                visualPlane.position.copy(controls.target);
-                visualPlane.lookAt(camera.position);
-            }
-
+        
             renderer.render(scene, camera);
         }
 
