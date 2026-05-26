@@ -396,6 +396,8 @@
                     });
                     masterProjectData.length = 0;
 
+                    fileHandle = null; // Forgets the old file location so you don't overwrite it!
+
                     // Rebuild meshes from coordinate array
                     importedData.forEach(strokePointsData => {
                         const reconstructedPoints = strokePointsData.map(p => new THREE.Vector3(p.x, p.y, p.z));
