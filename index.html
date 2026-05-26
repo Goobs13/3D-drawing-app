@@ -132,6 +132,7 @@
         // 2. Setup Camera Controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+        controls.screenSpacePanning = false; // Locks standard panning to X and Z axes
         controls.mouseButtons = {
             LEFT: THREE.MOUSE.NONE,
             MIDDLE: THREE.MOUSE.DOLLY,
@@ -240,6 +241,22 @@
                 addPoint(event);
             }
         });
+
+        // NEW: Scroll Wheel Elevator (Shift + Scroll to change height)
+        window.addEventListener('wheel', (event) => {
+            if (event.shiftKey) {
+                // Stop OrbitControls from zooming the camera in and out
+                event.stopImmediatePropagation(); 
+
+                // Adjust sensitivity (smaller number = slower, smoother movement)
+                const elevatorSpeed = event.deltaY * 0.001; 
+
+                // Move both the target and the camera up/down together 
+                // to maintain your exact viewing angle while changing altitude
+                controls.target.y -= elevatorSpeed;
+                //camera.position.y -= elevatorSpeed;
+            }
+        }, { capture: true }); // 'capture' ensures we catch the scroll before OrbitControls does
 
         function addPoint(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
