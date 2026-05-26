@@ -95,12 +95,6 @@
         </p>
     </div>
 
-    <div id="toolbar" style="font-family: sans-serif; font-weight: bold; font-size: 14px;">
-        <button class="tool-btn active" id="tool-draw" title="Draw">Draw</button>
-        <button class="tool-btn" id="tool-rotate" title="Rotate Plane">Rotate Plane</button>
-        <button class="tool-btn" id="tool-select" title="Select">Select</button>
-    </div>
-
     <div id="center-crosshair"></div>
 
     <script type="importmap">
@@ -207,40 +201,7 @@
         // Tracks which arrow keys are currently being held down
         const keysPressed = {};
 
-        // NEW: Tool State Configuration
-        let activeTool = 'draw'; 
-
-        const toolButtons = {
-            draw: document.getElementById('tool-draw'),
-            rotate: document.getElementById('tool-rotate'),
-            select: document.getElementById('tool-select')
-        };
-
-        function changeTool(toolName) {
-            activeTool = toolName;
-            
-            // Loop through buttons to toggle the 'active' highlight class
-            Object.keys(toolButtons).forEach(key => {
-                if (key === toolName) {
-                    toolButtons[key].classList.add('active');
-                } else {
-                    toolButtons[key].classList.remove('active');
-                }
-            });
-
-            // Remap camera controls based on the active tool
-            if (activeTool === 'rotate') {
-                controls.mouseButtons.LEFT = THREE.MOUSE.PAN;     // Left click pans the scene
-                controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;  // Right click rotates
-            } else {
-                controls.mouseButtons.LEFT = THREE.MOUSE.NONE;    // Frees up left click for drawing
-                controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;  // Right click rotates
-            }
-        }
-
-        toolButtons.draw.addEventListener('click', () => changeTool('draw'));
-        toolButtons.rotate.addEventListener('click', () => changeTool('rotate'));
-        toolButtons.select.addEventListener('click', () => changeTool('select'));
+        const activeTool = 'draw';
 
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
