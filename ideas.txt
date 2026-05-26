@@ -31,9 +31,16 @@ pointer in the middle), and just by moving around in the world you change where 
 - change color, size
 - shift scroll should move it perpendicular to the canvas?
 - whe you hover over the save buttons it tells you hwat it does
+- scroll wheel or slider or smth for user to change canvas size
+--- maybe opacity and stuff too?
+
 
 - SEO optimized website
 - digital advertising (advertise 3D drawing app)
 - website link + description
 - logo/thumbnail
+- 3D Drawing App Online Free No Download
+   - Draw in 3D online for free - no download, no payment,
+     open website to use. Export as JSON or GLB. 
+- 
       
