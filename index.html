@@ -210,7 +210,7 @@
         <button id="clear-btn" class="bottom-btn">Clear</button>
     </div>
 
-    <<div id="tools-menu" style="display: none;">
+    <div id="tools-menu" style="display: none;">
         <h3>Tool Settings</h3>
         <div class="menu-row">
             <button id="brush-mode-btn" class="menu-toggle-btn active">Brush Mode</button>
@@ -614,10 +614,16 @@
         });
 
         // Track pickers and sliders configuration changes
+        // Updates the active drawing brush color in real time
         document.getElementById('brush-color').addEventListener('input', (e) => {
             brushColor = e.target.value;
+        });
+
+        // Commits the finalized color selection to your recent palette history row
+        document.getElementById('brush-color').addEventListener('change', (e) => {
             pushRecentColor(e.target.value);
         });
+
         document.getElementById('brush-thickness').addEventListener('input', (e) => brushThickness = parseFloat(e.target.value));
 
         // Swap workspace pipeline paths back to vector line compilation mechanics
