@@ -50,6 +50,37 @@
             background: #00ff88;
             color: #1a1a1a;
         }
+
+        #center-crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            pointer-events: none; /* Allows clicks to pass right through it */
+            opacity: 0.5;         /* Keeps it subtle and translucent */
+        }
+        /* Horizontal line of the plus */
+        #center-crosshair::before {
+            content: '';
+            position: absolute;
+            top: 7px;
+            left: 0;
+            width: 16px;
+            height: 2px;
+            background-color: #ffffff;
+        }
+        /* Vertical line of the plus */
+        #center-crosshair::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 7px;
+            width: 2px;
+            height: 16px;
+            background-color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -71,6 +102,8 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="M19 17c-2.5 0-4 1.5-6 1.5s-3.5-1.5-6-1.5" opacity="0.6"/></svg>
         </button>
     </div>
+
+    <div id="center-crosshair"></div>
 
     <script type="importmap">
         {
@@ -282,6 +315,9 @@
             requestAnimationFrame(animate);
             controls.update();
         
+            // NEW: Keeps the yellow sketchpad aligned with the floating pivot height
+            visualPlane.position.y = controls.target.y;
+            
             renderer.render(scene, camera);
         }
 
