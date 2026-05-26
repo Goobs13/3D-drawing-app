@@ -186,6 +186,9 @@
         // NEW: Independent altitude tracker for the sketchpad
         let drawingHeight = 0.01;
 
+        // Tracks which arrow keys are currently being held down
+        const keysPressed = {};
+
         // NEW: Tool State Configuration
         let activeTool = 'draw'; 
 
@@ -258,25 +261,18 @@
             }
         }, { capture: true }); // 'capture' ensures we catch the scroll before OrbitControls does
 
-        // Arrow keys rotate strictly along the canvas's internal center lines (local axes)
+        // Turn on the switch when a key is pressed down
         window.addEventListener('keydown', (event) => {
-            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-            event.preventDefault(); 
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                event.preventDefault(); 
+                keysPressed[event.key] = true;
+            }
+        });
 
-            const rotationSpeed = 0.04; 
-
-            if (event.key === 'ArrowUp') {
-                // Rotates around the canvas's local horizontal axis
-                visualPlane.rotateX(-rotationSpeed);
-            } else if (event.key === 'ArrowDown') {
-                // Rotates around the canvas's local horizontal axis
-                visualPlane.rotateX(rotationSpeed);
-            } else if (event.key === 'ArrowLeft') {
-                // Rotates around the canvas's local vertical axis
-                visualPlane.rotateY(-rotationSpeed);
-            } else if (event.key === 'ArrowRight') {
-                // Rotates around the canvas's local vertical axis
-                visualPlane.rotateY(rotationSpeed);
+        // Turn off the switch the moment the key is released
+        window.addEventListener('keyup', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                keysPressed[event.key] = false;
             }
         });
 
@@ -354,6 +350,23 @@
             requestAnimationFrame(animate);
             controls.update();
         
+            // NEW: Smoothly rotates the canvas if a key switch is active
+            // (Lowered speed slightly because this now executes up to 60+ times per second)
+            const frameRotationSpeed = 0.005; 
+            
+            if (keysPressed['ArrowUp']) {
+                visualPlane.rotateX(-frameRotationSpeed);
+            }
+            if (keysPressed['ArrowDown']) {
+                visualPlane.rotateX(frameRotationSpeed);
+            }
+            if (keysPressed['ArrowLeft']) {
+                visualPlane.rotateY(-frameRotationSpeed);
+            }
+            if (keysPressed['ArrowRight']) {
+                visualPlane.rotateY(frameRotationSpeed);
+            }
+
             // Keeps the yellow pad locked to our independent height variable
             visualPlane.position.y = drawingHeight;
             
