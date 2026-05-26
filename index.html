@@ -175,6 +175,24 @@
         // Add the border as a child of the plane so they stay locked together
         visualPlane.add(border);
 
+        // Add transparent blue lines across the local center axes of the canvas
+        const axesPoints = [
+            // Horizontal line across the middle (Local X)
+            new THREE.Vector3(-7.5, 0, 0), new THREE.Vector3(7.5, 0, 0),
+            // Vertical line across the middle (Local Y)
+            new THREE.Vector3(0, -7.5, 0), new THREE.Vector3(0, 7.5, 0)
+        ];
+        
+        const axesGeometry = new THREE.BufferGeometry().setFromPoints(axesPoints);
+        const axesMaterial = new THREE.LineBasicMaterial({ 
+            color: 0x00aaff, 
+            transparent: true, 
+            opacity: 0.4 
+        });
+        const localAxes = new THREE.LineSegments(axesGeometry, axesMaterial);
+        
+        visualPlane.add(localAxes);
+
         // 6. Drawing Logic Variables
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -284,7 +302,7 @@
             
             // CHANGED: Instead of an infinite math plane, we test collisions 
             // directly against our physical 8x8 yellow canvas mesh.
-            const intersects = raycaster.intersectObject(visualPlane);
+            const intersects = raycaster.intersectObject(visualPlane, false);
             
             // Only draw if the raycaster laser actually hits the yellow square
             if (intersects.length > 0) {
