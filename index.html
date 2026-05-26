@@ -71,11 +71,11 @@
         scene.add(directionalLight);
 
         // 5. CHANGED: Shrunk PlaneGeometry from (25, 25) to (8, 8)
-        const planeGeometry = new THREE.PlaneGeometry(8, 8);
+        const planeGeometry = new THREE.PlaneGeometry(15, 15);
         const planeMaterial = new THREE.MeshBasicMaterial({
             color: 0xffcc00,
             transparent: true,
-            opacity: 0.6,
+            opacity: 0.4,
             side: THREE.DoubleSide,
             depthWrite: false
         });
@@ -147,18 +147,50 @@
 
                 currentStrokePoints.push(intersectionPoint.clone());
 
-                if (currentStrokePoints.length > 1) {
-                    const curve = new THREE.CatmullRomCurve3(currentStrokePoints);
-                    const geometry = new THREE.TubeGeometry(curve, currentStrokePoints.length * 2, 0.08, 8, false);
-                    const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
+                const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, roughness: 0.3 });
 
-                    if (currentStrokeMesh) {
-                        scene.remove(currentStrokeMesh);
-                        currentStrokeMesh.geometry.dispose();
+                // 1. First click: Create a container Group and drop the starting sphere inside
+                if (currentStrokePoints.length === 1) {
+                    currentStrokeMesh = new THREE.Group(); 
+                    scene.add(currentStrokeMesh);
+
+                    const geometry = new THREE.SphereGeometry(0.08, 8, 8);
+                    const startSphere = new THREE.Mesh(geometry, material);
+                    startSphere.position.copy(intersectionPoint);
+                    startSphere.name = "startSphere";
+                    
+                    currentStrokeMesh.add(startSphere);
+                } 
+                // 2. Dragging: Keep the start sphere, update the tube, and update the end sphere
+                else if (currentStrokePoints.length > 1) {
+                    
+                    // Find and clean up the old tube mesh from the previous frame
+                    const oldTube = currentStrokeMesh.getObjectByName("tube");
+                    if (oldTube) {
+                        currentStrokeMesh.remove(oldTube);
+                        oldTube.geometry.dispose();
                     }
 
-                    currentStrokeMesh = new THREE.Mesh(geometry, material);
-                    scene.add(currentStrokeMesh);
+                    // Find and clean up the old end sphere from the previous frame
+                    const oldEndSphere = currentStrokeMesh.getObjectByName("endSphere");
+                    if (oldEndSphere) {
+                        currentStrokeMesh.remove(oldEndSphere);
+                        oldEndSphere.geometry.dispose();
+                    }
+
+                    // Build the updated tube geometry across all accumulated points
+                    const curve = new THREE.CatmullRomCurve3(currentStrokePoints);
+                    const tubeGeometry = new THREE.TubeGeometry(curve, currentStrokePoints.length * 2, 0.08, 8, false);
+                    const tube = new THREE.Mesh(tubeGeometry, material);
+                    tube.name = "tube";
+                    currentStrokeMesh.add(tube);
+
+                    // Build a brand new end sphere at the latest point
+                    const sphereGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+                    const endSphere = new THREE.Mesh(sphereGeometry, material);
+                    endSphere.position.copy(intersectionPoint);
+                    endSphere.name = "endSphere";
+                    currentStrokeMesh.add(endSphere);
                 }
             }
         }
