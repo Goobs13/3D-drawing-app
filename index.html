@@ -675,7 +675,11 @@
                     const strokeColor = strokeData.color || '#00ff88';
                     const strokeThickness = strokeData.thickness || 0.08;
 
-                    masterProjectData.push(strokeData.points ? strokeData : pointsArray);
+                    masterProjectData.push({
+                        points: pointsArray,
+                        color: strokeColor,
+                        thickness: strokeThickness
+                    });
 
                     const strokeGroup = new THREE.Group();
                     const material = new THREE.MeshStandardMaterial({ color: strokeColor, roughness: 0.3 });
