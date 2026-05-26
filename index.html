@@ -141,6 +141,23 @@
             border-color: #00ff88;
         }
 
+        .menu-toggle-btn {
+            flex: 1;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .menu-toggle-btn.active {
+            background: #00aaff;
+            border-color: #00d5ff;
+        }
+
     </style>
 </head>
 <body>
@@ -166,8 +183,12 @@
         <button id="clear-btn" class="bottom-btn">Clear</button>
     </div>
 
-    <div id="tools-menu" style="display: none;">
+    <<div id="tools-menu" style="display: none;">
         <h3>Tool Settings</h3>
+        <div class="menu-row">
+            <button id="brush-mode-btn" class="menu-toggle-btn active">Brush Mode</button>
+            <button id="eraser-mode-btn" class="menu-toggle-btn">Eraser Mode</button>
+        </div>
         <div class="menu-row">
             <label>Color:</label>
             <input type="color" id="brush-color" value="#00ff88">
@@ -180,7 +201,7 @@
 
     <div id="right-panel">
         <button id="save-json-btn" class="side-btn">Save Project</button>
-        <button id="export-glb-btn" class="side-btn">Export 3D Asset</button>
+        <button id="export-glb-btn" class="side-btn">Export 3D Mesh</button>
         <button id="import-btn" class="side-btn">Import Project</button>
     </div>
 
@@ -296,22 +317,49 @@
         let brushColor = '#00ff88';
         let brushThickness = 0.08;
 
+        // NEW: Eraser tracking variables
+        let isEraserMode = false;
+        let hoveredGroup = null;
+
         let hasUnsavedChanges = false; // Tracks if the user has unsaved work
 
         let fileHandle = null; // NEW: Remembers the saved file location
 
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
-            // NEW: Ignore the click if the user is clicking on a UI element
             if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#bottom-panel') || event.target.closest('#tools-menu')) {
                 return;
             }
             
             if (event.button === 0) { 
-                isDrawing = true;
-                currentStrokePoints = [];
-                currentStrokeMesh = null;
-                addPoint(event);
+                // NEW: Handle Eraser click-to-delete pattern
+                if (isEraserMode) {
+                    if (hoveredGroup) {
+                        const index = masterStrokeMeshes.indexOf(hoveredGroup);
+                        if (index !== -1) {
+                            // Strip memory allocations from active workspace arrays
+                            masterStrokeMeshes.splice(index, 1);
+                            masterProjectData.splice(index, 1);
+
+                            // Purge VRAM completely to eliminate memory leaks
+                            hoveredGroup.traverse((object) => {
+                                if (object.isMesh) {
+                                    if (object.geometry) object.geometry.dispose();
+                                    if (object.material) object.material.dispose();
+                                }
+                            });
+                            scene.remove(hoveredGroup);
+                            hoveredGroup = null; // Blank tracking out
+                            hasUnsavedChanges = true;
+                        }
+                    }
+                } else {
+                    // Default drawing execution branch
+                    isDrawing = true;
+                    currentStrokePoints = [];
+                    currentStrokeMesh = null;
+                    addPoint(event);
+                }
             }
         });
 
@@ -338,10 +386,55 @@
         });
 
         window.addEventListener('pointermove', (event) => {
-            if (isDrawing) {
+            if (isEraserMode) {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+
+                // Target intersections directly against drawn line containers
+                const intersects = raycaster.intersectObjects(masterStrokeMeshes, true);
+
+                if (intersects.length > 0) {
+                    // Climb up structural tree geometry transforms to target group parent node
+                    let targetGroup = intersects[0].object.parent;
+                    while (targetGroup && targetGroup.type !== 'Group') {
+                        targetGroup = targetGroup.parent;
+                    }
+
+                    if (hoveredGroup !== targetGroup) {
+                        resetHoverHighlight(); // Revert previous target back to standard color
+                        hoveredGroup = targetGroup;
+
+                        // Mutate entire stroke geometry group colors to solid warning crimson
+                        hoveredGroup.traverse((child) => {
+                            if (child.isMesh && child.material) {
+                                child.material.color.setHex(0xff4444);
+                            }
+                        });
+                    }
+                } else {
+                    resetHoverHighlight(); // Clear styles when floating over empty workspace spaces
+                }
+            } else if (isDrawing) {
                 addPoint(event);
             }
         });
+
+        // Helper cleanup function to safely reverse color highlights back to data array states
+        function resetHoverHighlight() {
+            if (hoveredGroup) {
+                const index = masterStrokeMeshes.indexOf(hoveredGroup);
+                if (index !== -1 && masterProjectData[index]) {
+                    const originalColor = masterProjectData[index].color;
+                    hoveredGroup.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material.color.set(originalColor);
+                        }
+                    });
+                }
+                hoveredGroup = null;
+            }
+        }
 
         // NEW: Scroll Wheel Elevator (Shift + Scroll to change height)
         window.addEventListener('wheel', (event) => {
@@ -491,6 +584,21 @@
         // Track pickers and sliders configuration changes
         document.getElementById('brush-color').addEventListener('input', (e) => brushColor = e.target.value);
         document.getElementById('brush-thickness').addEventListener('input', (e) => brushThickness = parseFloat(e.target.value));
+
+        // Swap workspace pipeline paths back to vector line compilation mechanics
+        document.getElementById('brush-mode-btn').addEventListener('click', () => {
+            isEraserMode = false;
+            resetHoverHighlight(); // Instantly wipe stray hover states
+            document.getElementById('brush-mode-btn').classList.add('active');
+            document.getElementById('eraser-mode-btn').classList.remove('active');
+        });
+
+        // Swap workspace pipeline paths over to geometric raycast intersection checks
+        document.getElementById('eraser-mode-btn').addEventListener('click', () => {
+            isEraserMode = true;
+            document.getElementById('eraser-mode-btn').classList.add('active');
+            document.getElementById('brush-mode-btn').classList.remove('active');
+        });
 
         document.getElementById('save-json-btn').addEventListener('click', async () => {
             if (masterProjectData.length === 0) return alert("Nothing to save yet!");
