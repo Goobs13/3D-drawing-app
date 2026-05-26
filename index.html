@@ -235,6 +235,8 @@
 
         const masterProjectData = [];
 
+        let hasUnsavedChanges = false; // Tracks if the user has unsaved work
+
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
             if (event.button === 0) { 
@@ -250,6 +252,7 @@
                 isDrawing = false;
                 if (currentStrokePoints.length > 0) {
                     masterProjectData.push(currentStrokePoints);
+                    hasUnsavedChanges = true; // Mark project as modified
                 }
             }
         });
@@ -289,6 +292,14 @@
             }
         });
 
+        // Intercept tab close or reload if there are unsaved strokes
+        window.addEventListener('beforeunload', (event) => {
+            if (hasUnsavedChanges) {
+                event.preventDefault();
+                event.returnValue = ''; // Standard browser requirement to trigger the prompt
+            }
+        });
+
         // Reset button logic to clear canvas height and rotation orientation
         document.getElementById('reset-btn').addEventListener('click', () => {
             drawingHeight = 0.01;
@@ -305,6 +316,8 @@
             link.href = URL.createObjectURL(blob);
             link.download = "my-3d-drawing-project.json";
             link.click();
+
+            hasUnsavedChanges = false; // Saved successfully
         });
 
         document.getElementById('export-glb-btn').addEventListener('click', () => {
@@ -379,6 +392,8 @@
                         }
                         scene.add(strokeGroup);
                     });
+
+                    hasUnsavedChanges = false; // Freshly imported project has no new changes
 
                     event.target.value = ''; // Clear file input
                 } catch (err) {
