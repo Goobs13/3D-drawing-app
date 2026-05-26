@@ -170,6 +170,15 @@
                     toolButtons[key].classList.remove('active');
                 }
             });
+
+            // Remap camera controls based on the active tool
+            if (activeTool === 'move') {
+                controls.mouseButtons.LEFT = THREE.MOUSE.PAN;     // Left click pans the scene
+                controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;  // Right click rotates
+            } else {
+                controls.mouseButtons.LEFT = THREE.MOUSE.NONE;    // Frees up left click for drawing
+                controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;  // Right click rotates
+            }
         }
 
         toolButtons.select.addEventListener('click', () => changeTool('select'));
