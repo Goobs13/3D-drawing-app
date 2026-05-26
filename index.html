@@ -240,6 +240,11 @@
 
         // 7. Event Listeners
         window.addEventListener('pointerdown', (event) => {
+            // NEW: Ignore the click if the user is clicking on a UI element
+            if (event.target.closest('#right-panel') || event.target.closest('#ui-overlay') || event.target.closest('#reset-btn')) {
+                return;
+            }
+            
             if (event.button === 0) { 
                 isDrawing = true;
                 currentStrokePoints = [];
